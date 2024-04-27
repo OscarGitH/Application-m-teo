@@ -7,7 +7,7 @@ JavaScript, and it retrieves weather data from the OpenWeatherMap API.
 
 ## Installation
 
-1. Clone this repository on your local machine using `git clone https://github.com/OscarGitH/Application méteo.git`.
+1. Clone this repository on your local machine using `git clone https://github.com/OscarGitH/Application-m-teo.git`.
 2. Or if you have the zip file, extract it to a folder on your local machine.
 
 ## Usage
