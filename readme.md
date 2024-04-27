@@ -7,8 +7,8 @@ JavaScript, and it retrieves weather data from the OpenWeatherMap API.
 
 ## Installation
 
-1. Clone this repository on your local machine using `git clone https://github.com/OscarGitH/R4.A.10-TP1.git`.
-2. Or if you have the zip file, extract it to a folder on your local machine.
+1. Clone this repository on your local machine using `git clone --branch TP1 --single-branch https://github.com/OscarGitH/R4.A.10-TP1.git`.
+3. Or if you have the zip file, extract it to a folder on your local machine.
 
 ## Usage
 
