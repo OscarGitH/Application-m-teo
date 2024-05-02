@@ -1,241 +1,312 @@
-document.addEventListener('DOMContentLoaded', (event) => {
-  const submitButton = document.getElementById('submitButton');
-  const path = window.location.pathname;
-  const page = path.split("/").pop();
-  if (page !== "index.html") {
-    const searchBar = document.getElementById("cityInput");
-
-    searchBar.disabled = true;
-    submitButton.disabled = true;
-    searchBar.style.display = "none";
-    submitButton.style.display = "none";
-  } else {
-    submitButton.addEventListener('click', function (event) {
-      event.preventDefault();
-
-      handleFormSubmission();
-    });
-
-    document.getElementById('cityInput').value = "Paris";
-
-    handleFormSubmission();
-  }
-});
-
-function handleFormSubmission() {
-  var cityInput = document.getElementById('cityInput').value;
-
-  if (!cityInput) {
-    alert('Please enter a city');
-    return;
-  }
-
-  var url = 'http://api.openweathermap.org/data/2.5/weather?q=' + cityInput + '&appid=ee07e2bf337034f905cde0bdedae3db8';
-  var xhr = new XMLHttpRequest();
-
-  xhr.addEventListener('load', function () {
-    if (xhr.status >= 200 && xhr.status < 300) {
-      var response = JSON.parse(xhr.responseText);
-      displayWeatherData(response, cityInput);
+const apiKey = 'ee07e2bf337034f905cde0bdedae3db8';
+jQuery(document).ready(function () {
+    const path = window.location.pathname;
+    const page = path.split("/").pop();
+    if (page !== "index.html") {
+        $('#cityInput').prop('disabled', true);
+        $('#submitButton').prop('disabled', true);
     } else {
-      console.error('The request failed with status code ' + xhr.status);
+        $('#submitButton').click(function () {
+            getCoordinatesFromCity($('#cityInput').val());
+        });
+
+        let cityInput = $('#cityInput');
+        cityInput.val("Paris");
+        getCoordinatesFromCity(cityInput.val());
     }
-  });
+})
+;
 
-  xhr.addEventListener('error', function () {
-    console.error('A network error occurred');
-  });
+function getCoordinatesFromCity(cityName) {
+    const url = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(cityName)}&limit=1&appid=${apiKey}`;
 
-  xhr.addEventListener('timeout', function () {
-    console.error('The request timed out');
-  });
+    $.get(url, function (data) {
+        if (data.length > 0) {
+            const lat = data[0].lat;
+            const lon = data[0].lon;
 
-  xhr.open('GET', url, true);
-  xhr.send();
+            getAPIWeather(lat, lon);
+            getAPIForecast(lat, lon);
+        } else {
+            console.error(`No coordinates found for city: ${cityName}`);
+        }
+    }).fail(function (jqXHR, textStatus) {
+        console.error('The request failed with status code ' + textStatus);
+    });
+}
+
+function getAPIWeather(lat, lon) {
+    const weatherUrl = `http://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+
+    $.get(weatherUrl, function (data) {
+        displayWeatherData(data, $('#cityInput').val());
+
+        getAPIForecast(lat, lon);
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        console.error('Error fetching weather data:', textStatus, errorThrown);
+    });
+}
+
+function getAPIForecast(lat, lon) {
+    const forecastUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
+
+    $.get(forecastUrl, function (data) {
+        displayForecast(data);
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        console.error('Error fetching forecast:', textStatus, errorThrown);
+    });
+}
+
+function displayForecast(forecastData) {
+    if (!forecastData.list || !Array.isArray(forecastData.list)) {
+        console.error('Invalid forecast data:', forecastData);
+        return;
+    }
+
+    const forecastList = forecastData.list;
+    const forecastContainer = $('#forecastContainer');
+    forecastContainer.empty();
+
+    const forecastsByDay = forecastList.reduce((groups, forecast) => {
+        const date = new Date(forecast.dt * 1000).toISOString().split('T')[0];
+        if (!groups[date]) {
+            groups[date] = [];
+        }
+        groups[date].push(forecast);
+        return groups;
+    }, {});
+
+    for (const date in forecastsByDay) {
+        const forecast = forecastsByDay[date][0];
+        const dayOfWeek = new Date(date).toLocaleDateString('en-US', {weekday: 'long'}).slice(0, 3) + '.';
+        const temp = forecast.main.temp;
+        const description = forecast.weather[0].description;
+        const icon = forecast.weather[0].icon;
+
+        const minTemp = Math.min(...forecastsByDay[date].map(forecast => forecast.main.temp_min));
+        const maxTemp = Math.max(...forecastsByDay[date].map(forecast => forecast.main.temp_max));
+
+        const forecastElement = `
+            <div class="grid-item-forecast">
+                <h2>${dayOfWeek}</h2>
+                <img src="http://openweathermap.org/img/wn/${icon}@2x.png" alt="${description}">
+                <div>
+                    <i class="wi wi-thermometer"></i>
+                    <p class="tempUnit">${temp}°C</p>
+                </div>
+                <p>${description}</p>
+                <div>
+                    <i class="wi wi-direction-down"></i>
+                    <p class="tempUnit">${minTemp}°C</p>
+                </div>
+                <div>
+                    <i class="wi wi-direction-up"></i>
+                    <p class="tempUnit">${maxTemp}°C</p>
+                </div>
+            </div>
+        `;
+
+        forecastContainer.append(forecastElement);
+    }
+}
+
+function selectRelevantInfo(forecastsForDay) {
+    const minTemp = Math.min(...forecastsForDay.map(forecast => forecast.main.temp_min));
+    const maxTemp = Math.max(...forecastsForDay.map(forecast => forecast.main.temp_max));
+    const icon = forecastsForDay[0].weather[0].icon;
+
+    return {
+        minTemp: minTemp, maxTemp: maxTemp, icon: icon
+    };
+}
+
+function addInfoToGridItem(day, info) {
+    const gridItem = $('.day' + day);
+    const tempMinElement = $('.tempMin' + day);
+    const tempMaxElement = $('.tempMax' + day);
+    const iconElement = $('.icon' + day);
+
+    tempMinElement.textContent = info.minTemp;
+    tempMaxElement.textContent = info.maxTemp;
+    iconElement.src = "http://openweathermap.org/img/wn/" + info.icon + ".png";
 }
 
 function displayWeatherData(weatherData, cityInput) {
-  var cityName = cityInput;
-  var temperature = Math.round(weatherData.main.temp - 273.15);
-  var feelsLike = Math.round(weatherData.main.feels_like - 273.15);
-  var minTemp = Math.round(weatherData.main.temp_min - 273.15);
-  var maxTemp = Math.round(weatherData.main.temp_max - 273.15);
-  var weatherDescription = weatherData.weather[0].description;
-  var windSpeed = Math.round(weatherData.wind.speed * 3.6);
-  var pressure = weatherData.main.pressure;
-  var humidity = weatherData.main.humidity;
-  var sunRise = new Date();
-  sunRise.setTime(weatherData.sys.sunrise * 1000);
-  var sunSet = new Date();
-  sunSet.setTime(weatherData.sys.sunset * 1000);
-  var currentDateTime = new Date();
-  currentDateTime.setTime(weatherData.dt * 1000);
-  var lastUpdateTimestamp = weatherData.dt;
-  lastUpdateTimestamp = new Date(lastUpdateTimestamp * 1000);
-  lastUpdateTimestamp = lastUpdateTimestamp.toLocaleString('en-US', {hour: 'numeric', minute: 'numeric'});
+    const cityName = cityInput;
+    let temperature = Math.round(weatherData.main.temp);
+    const feelsLike = Math.round(weatherData.main.feels_like);
+    const minTemp = Math.round(weatherData.main.temp_min);
+    const maxTemp = Math.round(weatherData.main.temp_max);
+    const weatherDescription = weatherData.weather[0].description;
+    const windSpeed = Math.round(weatherData.wind.speed * 3.6);
+    const pressure = weatherData.main.pressure;
+    const humidity = weatherData.main.humidity;
+    const sunRise = new Date();
+    sunRise.setTime(weatherData.sys.sunrise * 1000);
+    const sunSet = new Date();
+    sunSet.setTime(weatherData.sys.sunset * 1000);
+    const currentDateTime = new Date();
+    currentDateTime.setTime(weatherData.dt * 1000);
+    let lastUpdateTimestamp = weatherData.dt;
+    lastUpdateTimestamp = new Date(lastUpdateTimestamp * 1000);
+    lastUpdateTimestamp = lastUpdateTimestamp.toLocaleString('en-US', {hour: 'numeric', minute: 'numeric'});
 
 
-  var options = {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'};
-  var formattedDateTime = currentDateTime.toLocaleString('en-US', options);
-  var iconUrl = weatherData.weather[0].icon;
-  iconUrl = 'http://openweathermap.org/img/wn/' + iconUrl + '@2x.png';
-  var weatherIconElement = document.createElement('img');
-  weatherIconElement.src = iconUrl;
-  weatherIconElement.alt = 'Weather Icon';
-  var weatherIconContainer = document.getElementById('weatherIcon');
-  weatherIconContainer.innerHTML = '';
-  weatherIconContainer.appendChild(weatherIconElement);
+    const options = {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'};
+    const formattedDateTime = currentDateTime.toLocaleString('en-US', options);
+    let iconUrl = weatherData.weather[0].icon;
+    iconUrl = 'http://openweathermap.org/img/wn/' + iconUrl + '@2x.png';
+    const weatherIconElement = document.createElement('img');
+    weatherIconElement.src = iconUrl;
+    weatherIconElement.alt = 'Weather Icon';
+    const weatherIconContainer = document.getElementById('weatherIcon');
+    weatherIconContainer.innerHTML = '';
+    weatherIconContainer.appendChild(weatherIconElement);
 
-  var currentUnit = unitBtn.getAttribute('data-units');
-  if (currentUnit === 'F') {
-    temperature = (currentTemp * 9 / 5) + 32;
-  }
-  var windDirectionDegrees = weatherData.wind.deg;
-  console.log(windDirectionDegrees);
-  var windDirectionText = getWindDirectionText(windDirectionDegrees);
+    const currentUnit = unitBtn.getAttribute('data-units');
+    if (currentUnit === 'F') {
+        temperature = (currentTemp * 9 / 5) + 32;
+    }
+    var windDirectionDegrees = weatherData.wind.deg;
+    console.log(windDirectionDegrees);
+    var windDirectionText = getWindDirectionText(windDirectionDegrees);
 
-  document.getElementById('currentDateTime').textContent = formattedDateTime;
-  document.getElementById('cityName').textContent = cityName;
-  document.getElementById('temperature').textContent = temperature + "°" + currentUnit;
-  document.getElementById('temp_feelsLike').textContent = feelsLike + "°" + currentUnit;
-  document.getElementById('temp_min').textContent = minTemp + "°" + currentUnit;
-  document.getElementById('temp_max').textContent = maxTemp + "°" + currentUnit;
-  document.getElementById('weatherDescription').textContent = weatherDescription;
-  document.getElementById('windSpeed').textContent = windSpeed + ' m/s';
-  document.getElementById('pressure').textContent = pressure + ' hPa';
-  document.getElementById('humidity').textContent = humidity + '%';
-  document.getElementById('sunTime').textContent = sunRise.toLocaleTimeString().slice(0, 5) + " - " + sunSet.toLocaleTimeString().slice(0, 5);
-  document.getElementById('windDirection').textContent = windDirectionText;
-  document.getElementById('lastUpdated').textContent = 'Last updated today at ' + lastUpdateTimestamp;
+    document.getElementById('currentDateTime').textContent = formattedDateTime;
+    document.getElementById('cityName').textContent = cityName;
+    document.getElementById('temperature').textContent = temperature + "°" + currentUnit;
+    document.getElementById('temp_feelsLike').textContent = feelsLike + "°" + currentUnit;
+    document.getElementById('temp_min').textContent = minTemp + "°" + currentUnit;
+    document.getElementById('temp_max').textContent = maxTemp + "°" + currentUnit;
+    document.getElementById('weatherDescription').textContent = weatherDescription;
+    document.getElementById('windSpeed').textContent = windSpeed + ' m/s';
+    document.getElementById('pressure').textContent = pressure + ' hPa';
+    document.getElementById('humidity').textContent = humidity + '%';
+    document.getElementById('sunTime').textContent = sunRise.toLocaleTimeString().slice(0, 5) + " - " + sunSet.toLocaleTimeString().slice(0, 5);
+    document.getElementById('windDirection').textContent = windDirectionText;
+    document.getElementById('lastUpdated').textContent = 'Last updated today at ' + lastUpdateTimestamp;
 }
 
 if (window.location.pathname.split("/").pop() === "index.html") {
-  const unitBtn = document.getElementById('unitBtn');
+    $(document).ready(function () {
+        $('#unitBtn').on('click', function () {
+            const unitBtn = $(this);
+            const currentUnit = unitBtn.attr('data-units');
+            const newUnit = currentUnit === 'C' ? 'F' : 'C';
+            const conversionFactor = currentUnit === 'C' ? (9 / 5) : (5 / 9);
+            const conversionOffset = currentUnit === 'C' ? 32 : -32;
+            const newUnitSymbol = currentUnit === 'C' ? '°F' : '°C';
 
-  unitBtn.addEventListener('click', function () {
-    var currentUnit = document.getElementById('unitBtn').getAttribute('data-units');
-    var currentTemp = parseFloat(document.getElementById('temperature').textContent);
-    var currentTempMin = parseFloat(document.getElementById('temp_min').textContent);
-    var currentTempMax = parseFloat(document.getElementById('temp_max').textContent);
-    var currentTempFeelsLike = parseFloat(document.getElementById('temp_feelsLike').textContent);
+            unitBtn.attr('data-units', newUnit);
+            unitBtn.text(newUnitSymbol);
 
-    if (currentUnit === 'C') {
-      currentTemp = (currentTemp * 9 / 5) + 32;
-      currentTempMin = (currentTempMin * 9 / 5) + 32;
-      currentTempMax = (currentTempMax * 9 / 5) + 32;
-      currentTempFeelsLike = (currentTempFeelsLike * 9 / 5) + 32;
-      unitBtn.setAttribute('data-units', 'F');
-      unitBtn.textContent = '°F';
-    } else {
-      currentTemp = (currentTemp - 32) * 5 / 9;
-      currentTempMin = (currentTempMin - 32) * 5 / 9;
-      currentTempMax = (currentTempMax - 32) * 5 / 9;
-      currentTempFeelsLike = (currentTempFeelsLike - 32) * 5 / 9;
-      unitBtn.setAttribute('data-units', 'C');
-      unitBtn.textContent = '°C';
-    }
+            $('.tempUnit').each(function () {
+                const $this = $(this);
+                let temp = parseFloat($this.text().replace('°', ''));
 
-    document.getElementById('temperature').textContent = currentTemp.toFixed(0) + '°' + unitBtn.getAttribute('data-units');
-    document.getElementById('temp_min').textContent = currentTempMin.toFixed(0) + '°' + unitBtn.getAttribute('data-units');
-    document.getElementById('temp_max').textContent = currentTempMax.toFixed(0) + '°' + unitBtn.getAttribute('data-units');
-    document.getElementById('temp_feelsLike').textContent = currentTempFeelsLike.toFixed(0) + '°' + unitBtn.getAttribute('data-units');
-  });
+                if (currentUnit === 'C') {
+                    temp = (temp * conversionFactor) + conversionOffset;
+                } else {
+                    temp = (temp + conversionOffset) * conversionFactor;
+                }
 
-
-  const locateBtn = document.getElementById('locateBtn');
-  locateBtn.addEventListener('click', function () {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function (position) {
-        var lat = position.coords.latitude;
-        var lon = position.coords.longitude;
-        var url = 'http://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&appid=ee07e2bf337034f905cde0bdedae3db8';
-        var xhr = new XMLHttpRequest();
-
-        xhr.addEventListener('load', function () {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            var response = JSON.parse(xhr.responseText);
-            document.getElementById('cityInput').value = response.name;
-            handleFormSubmission();
-
-          } else {
-            console.error('The request failed with status code ' + xhr.status);
-          }
+                $this.text(temp.toFixed(0) + newUnitSymbol);
+            });
         });
+    });
 
-        xhr.addEventListener('error', function () {
-          console.error('A network error occurred');
-        });
 
-        xhr.addEventListener('timeout', function () {
-          console.error('The request timed out');
-        });
+    let areCardsVisible = false;
+    document.getElementById('moreBtn').addEventListener('click', function () {
+        let i;
+        const cards = document.getElementsByClassName('card');
+        const img = this.querySelector('img');
+        const gridContainer = document.querySelector('.grid-container');
+        let cardForecast = document.querySelector('.cardForecast');
 
-        xhr.open('GET', url, true);
-        xhr.send();
-      });
-    } else {
-      alert('Geolocation is not supported by your browser');
-    }
-  });
+        if (areCardsVisible) {
+            for (i = 0; i < cards.length; i++) {
+                cards[i].style.opacity = '0';
+                cards[i].style.visibility = 'hidden';
+                cards[i].style.display = 'none';
+            }
+            window.scrollTo({top: 0, behavior: 'smooth'});
 
-  var areCardsVisible = false;
-  document.getElementById('moreBtn').addEventListener('click', function () {
-    var cards = document.getElementsByClassName('card');
-    var img = this.querySelector('img');
+            img.style.transform = 'rotate(0deg)';
+            setTimeout(function () {
+                gridContainer.style.display = 'none';
 
-    if (areCardsVisible) {
-      for (var i = 0; i < cards.length; i++) {
-        cards[i].style.opacity = '0';
-        cards[i].style.visibility = 'hidden';
-      }
-      window.scrollTo({top: 0, behavior: 'smooth'});
-
-      img.style.transform = 'rotate(0deg)';
-      areCardsVisible = false;
-    } else {
-      for (var i = 0; i < cards.length; i++) {
-        cards[i].style.opacity = '1';
-        cards[i].style.visibility = 'visible';
-      }
-      window.scrollTo({top: 650, behavior: 'smooth'});
-      img.style.transform = 'rotate(180deg)';
-      areCardsVisible = true;
-    }
-  });
+            }, 600);
+            areCardsVisible = false;
+        } else {
+            for (i = 0; i < cards.length; i++) {
+                cards[i].style.opacity = '1';
+                cards[i].style.visibility = 'visible';
+                cards[i].style.display = 'block';
+            }
+            window.scrollTo({top: 650, behavior: 'smooth'});
+            img.style.transform = 'rotate(180deg)';
+            gridContainer.style.display = 'flex';
+            areCardsVisible = true;
+        }
+    });
 }
 
 function getWindDirectionText(degrees) {
-  if (degrees >= 348.75 || degrees < 11.25) {
-    return 'North';
-  } else if (degrees >= 11.25 && degrees < 78.75) {
-    return 'North East';
-  } else if (degrees >= 78.75 && degrees < 101.25) {
-    return 'East';
-  } else if (degrees >= 101.25 && degrees < 168.75) {
-    return 'South East';
-  } else if (degrees >= 168.75 && degrees < 191.25) {
-    return 'South';
-  } else if (degrees >= 191.25 && degrees < 258.75) {
-    return 'South West';
-  } else if (degrees >= 258.75 && degrees < 281.25) {
-    return 'West';
-  } else if (degrees >= 281.25 && degrees < 348.75) {
-    return 'North West';
-  } else {
-    return '';
-  }
+    if (degrees >= 348.75 || degrees < 11.25) {
+        return 'North';
+    } else if (degrees >= 11.25 && degrees < 78.75) {
+        return 'North East';
+    } else if (degrees >= 78.75 && degrees < 101.25) {
+        return 'East';
+    } else if (degrees >= 101.25 && degrees < 168.75) {
+        return 'South East';
+    } else if (degrees >= 168.75 && degrees < 191.25) {
+        return 'South';
+    } else if (degrees >= 191.25 && degrees < 258.75) {
+        return 'South West';
+    } else if (degrees >= 258.75 && degrees < 281.25) {
+        return 'West';
+    } else if (degrees >= 281.25 && degrees < 348.75) {
+        return 'North West';
+    } else {
+        return '';
+    }
 }
 
-const menuButton = document.getElementById('menuButton');
-const navLinks = document.getElementById('navLinks');
-menuButton.addEventListener('click', () => {
-  if (navLinks.style.display === 'flex') {
-    navLinks.style.animation = 'slideOutToRight 0.5s forwards';
-    setTimeout(() => {
-      navLinks.style.display = 'none';
-    }, 500);
-  } else {
-    navLinks.style.display = 'flex';
-    navLinks.style.animation = 'slideInFromRight 0.5s forwards';
-  }
+$('#menuButton').on('click', function () {
+    const navLinks = $('#navLinks');
+    if (navLinks.css('display') === 'flex') {
+        navLinks.css('animation', 'slideOutToRight 0.5s forwards');
+        setTimeout(() => {
+            navLinks.css('display', 'none');
+        }, 500);
+    } else {
+        navLinks.css('display', 'flex');
+        navLinks.css('animation', 'slideInFromRight 0.5s forwards');
+    }
+});
+
+$('#locateBtn').on('click', function () {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            function (position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                const url = 'http://api.openweathermap.org/data/2.5/weather?lat=' + lat + '&lon=' + lon + '&appid=ee07e2bf337034f905cde0bdedae3db8';
+                $.get(url)
+                    .done(function (data) {
+                        $('#cityInput').val(data.name);
+                        getAPIWeather(lat, lon);
+                    })
+                    .fail(function (jqXHR, textStatus, errorThrown) {
+                        console.error('The request failed:', textStatus, errorThrown);
+                    });
+            },
+            function (error) {
+                console.error('Geolocation error:', error);
+            }
+        );
+    } else {
+        console.error('Geolocation is not supported by your browser');
+    }
 });

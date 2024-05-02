@@ -98,11 +98,27 @@ nav {
     margin-bottom: 2rem;
 }
 
+.cardForecast {
+    background-color: rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    margin: 0 10rem 0 10rem;
+    border-radius: 0.5rem;
+}
+
+.cardForecast h1 {
+    margin: 1rem 0 1rem 2rem;
+    align-self: start;
+}
+
 .card {
     background-color: rgba(255, 255, 255, 0.1);
     border-radius: 0.5rem;
+    margin-bottom: 2rem;
     padding: 1.5rem;
     text-align: center;
+    display: none;
 }
 
 .card i {
@@ -141,6 +157,11 @@ nav {
 
 #submitButton:hover, #submitContactButton:hover {
     border: 1px solid rgba(255, 255, 255, 0.75);
+}
+
+#lastUpdated {
+    color: rgba(230, 230, 230, 0.61);
+    margin-top: 2rem;
 }
 
 /*----------------
@@ -250,21 +271,16 @@ nav {
     margin-bottom: 1rem;
 }
 
-.temp {
+#temperature {
     font-size: 10rem;
 }
 
 .container {
-    margin: 10rem auto;
-    width: 80%;
+    margin: 15rem auto;
+    width: 70%;
     padding: 2rem;
     background-color: rgba(255, 255, 255, 0.1);
     border-radius: 0.5rem;
-}
-
-h2 {
-    text-align: center;
-    margin-bottom: 2rem;
 }
 
 .input-group {
@@ -400,6 +416,41 @@ footer {
     display: none;
 }
 
+#forecastContainer {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+#forecastContainer .grid-item {
+    display: flex;
+    flex-direction: row;
+}
+
+.grid-item-forecast {
+    display: flex;
+    flex-direction: row;
+    padding: 2rem;
+    border-top: 1px solid #ffffff;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.grid-item-forecast .wi {
+    font-size: 2em;
+}
+
+.noUi-base {
+    pointer-events: none;
+}
+
+.noUi-handle {
+    pointer-events: none;
+    touch-action: none;
+    visibility: hidden;
+}
+
 /*----------------
     Responsive
 -----------------*/
@@ -461,6 +512,11 @@ footer {
     }
 
     .grid-container {
+        display: none;
+        margin: 0 5rem 0 5rem;
+    }
+
+    .cardForecast {
         margin: 0 5rem 0 5rem;
     }
 
