@@ -14,7 +14,6 @@ jQuery(document).ready(function () {
         cityInput.val("Paris");
         getCoordinatesFromCity(cityInput.val());
     }
-})
 ;
 
 function getCoordinatesFromCity(cityName) {
@@ -310,3 +309,4 @@ $('#locateBtn').on('click', function () {
         console.error('Geolocation is not supported by your browser');
     }
 });
+}
